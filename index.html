@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BELL SEKOLAH SMPN 5 RANCAEKEK</title>
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+@keyframes pulseStrong {
+  0%,100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+.pulse-strong { animation: pulseStrong 1s infinite; }
+.shake { animation: shake 0.3s infinite; }
+</style>
+</head>
+
+<body class="bg-gradient-to-br from-slate-100 to-slate-200 min-h-screen">
+
+<div class="max-w-5xl mx-auto px-4 py-6">
+
+<!-- HEADER -->
+<div class="bg-white rounded-2xl shadow p-6 text-center sticky top-2 z-10">
+  <h1 style="font-family: Clarendon Blk BT, sans-serif;"class="text-3xl font-bold text-gray-800 mb-2">SMPN 5 RANCAEKEK</h1>
+  <div style="display: flex; justify-content: center;"><img src="SEM.jpg" /> </div>
+
+  <div style="font-family: Clarendon Blk BT, sans-serif;"class="text-2xl font-bold text-gray-500 mb-2" id="clock" class="mt-2 text-sm text-slate-600"></div>
+
+  <div id="countdown" class="mt-2 text-lg font-bold hidden"></div>
+
+  <div id="upcoming" class="mt-3 text-sm bg-slate-50 rounded-xl p-3 text-left"></div>
+
+  <div class="flex justify-center gap-3 mt-4 flex-wrap">
+    <button id="statusToggle"
+      class="px-6 py-2 rounded-full bg-gray-400 text-white font-semibold">
+      Bell: NON AKTIF
+    </button>
+
+    <button id="exportBackup"
+      class="px-6 py-2 rounded-full bg-indigo-600 text-white font-semibold">
+      📤 Export Backup
+    </button>
+
+    <label class="px-6 py-2 rounded-full bg-emerald-600 text-white font-semibold cursor-pointer">
+      📥 Import Backup
+      <input type="file" id="importBackup" accept=".json" hidden>
+    </label>
+  </div>
+</div>
+
+<!-- SUARA -->
+<div class="bg-white rounded-2xl shadow p-6 mt-6">
+  <h2 class="font-bold text-lg mb-4">🎵 Manajemen Suara</h2>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <input type="file" id="soundFile" accept="audio/*" class="border rounded px-3 py-2">
+    <input type="text" id="soundName" placeholder="Nama suara" class="border rounded px-3 py-2">
+    <button id="addSound" class="bg-blue-600 text-white rounded px-4 py-2">
+      Simpan
+    </button>
+  </div>
+  <ul id="soundList" class="mt-4 space-y-1 text-sm"></ul>
+</div>
+
+<!-- JADWAL -->
+<div class="bg-white rounded-2xl shadow p-6 mt-6">
+  <h2 class="font-bold text-lg mb-4">📅 Jadwal Bell</h2>
+
+  <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mb-6">
+    <input type="time" id="bellTime" class="border rounded px-3 py-2">
+    <input type="text" id="bellNote" placeholder="Keterangan" class="border rounded px-3 py-2">
+    <select id="soundSelect" class="border rounded px-3 py-2"></select>
+    <select id="sessionSelect" class="border rounded px-3 py-2">
+      <option value="pagi">Pagi</option>
+      <option value="siang">Siang</option>
+    </select>
+    <button id="addSchedule" class="bg-green-600 text-white rounded px-4 py-2">
+      Tambah
+    </button>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div>
+      <h3 class="font-semibold text-blue-600 mb-2"> <!-- pagi --></h3>
+      <ul id="schedulePagi" class="space-y-2"></ul>
+    </div>
+    <div>
+      <h3 class="font-semibold text-orange-600 mb-2"> <!-- siang --></h3>
+      <ul id="scheduleSiang" class="space-y-2"></ul>
+    </div>
+  </div>
+</div>
+
+<footer class="text-center mt-8 text-xs text-slate-500">
+© 2025 SMPN 5 By NJ
+</footer>
+
+</div>
+
+<audio id="bellAudio"></audio>
+
+<script>
+let bellActive=false,lastPlayed={}
+let sounds=JSON.parse(localStorage.getItem("sounds")||"[]")
+let schedules=JSON.parse(localStorage.getItem("schedules"))||{pagi:[],siang:[]}
+
+const audio=document.getElementById("bellAudio")
+const upcomingDiv=document.getElementById("upcoming")
+
+/* ===== EXPORT ===== */
+exportBackup.onclick=()=>{
+  const data={
+    app:"Bell Sekolah Digital",
+    sekolah:"SMPN 5 Rancaekek",
+    dibuat:new Date().toISOString(),
+    bellActive,
+    sounds,
+    schedules
+  }
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"})
+  const a=document.createElement("a")
+  a.href=URL.createObjectURL(blob)
+  a.download="backup-bell-smpn5-rancaekek.json"
+  a.click()
+}
+
+/* ===== IMPORT ===== */
+importBackup.onchange=e=>{
+  const file=e.target.files[0]
+  if(!file)return
+  const r=new FileReader()
+  r.onload=()=>{
+    try{
+      const d=JSON.parse(r.result)
+      if(!d.schedules||!d.sounds)throw "Format salah"
+      sounds=d.sounds
+      schedules=d.schedules
+      bellActive=!!d.bellActive
+      localStorage.setItem("sounds",JSON.stringify(sounds))
+      localStorage.setItem("schedules",JSON.stringify(schedules))
+      alert("Backup berhasil direstore")
+      location.reload()
+    }catch{
+      alert("File backup tidak valid!")
+    }
+  }
+  r.readAsText(file)
+}
+
+/* ===== SUARA ===== */
+addSound.onclick=()=>{
+  const f=soundFile.files[0],n=soundName.value.trim()
+  if(!f||!n)return alert("Lengkapi data")
+  const r=new FileReader()
+  r.onload=()=>{
+    sounds.push({id:Date.now(),name:n,data:r.result})
+    localStorage.setItem("sounds",JSON.stringify(sounds))
+    renderSounds();renderSoundSelect()
+    soundFile.value=soundName.value=""
+  }
+  r.readAsDataURL(f)
+}
+
+/* ===== JADWAL ===== */
+addSchedule.onclick=()=>{
+  if(!bellTime.value||!soundSelect.value)return
+  schedules[sessionSelect.value].push({
+    time:bellTime.value,note:bellNote.value,soundId:soundSelect.value
+  })
+  localStorage.setItem("schedules",JSON.stringify(schedules))
+  bellTime.value=bellNote.value=""
+  renderSchedules()
+}
+
+/* ===== RENDER ===== */
+function renderSounds(){
+  soundList.innerHTML=""
+  sounds.forEach(s=>soundList.innerHTML+=`<li class="bg-slate-50 p-2 rounded">🔊 ${s.name}</li>`)
+}
+function renderSoundSelect(){
+  soundSelect.innerHTML=sounds.map(s=>`<option value="${s.id}">${s.name}</option>`).join("")
+}
+function renderSchedules(){
+  schedulePagi.innerHTML=scheduleSiang.innerHTML=""
+  ;["pagi","siang"].forEach(sess=>{
+    schedules[sess].forEach((s,i)=>{
+      const snd=sounds.find(x=>x.id==s.soundId)
+      const li=document.createElement("li")
+      li.className="bg-slate-50 p-3 rounded flex justify-between"
+      li.innerHTML=`<div>
+        <b>${s.time}</b> - ${s.note||"-"}<br>
+        <span class="text-xs">🔊 ${snd?.name||""}</span>
+      </div>
+      <button onclick="hapus('${sess}',${i})" class="text-red-600">❌</button>`
+      (sess=="pagi"?schedulePagi:scheduleSiang).appendChild(li)
+    })
+  })
+}
+function hapus(sess,i){
+  schedules[sess].splice(i,1)
+  localStorage.setItem("schedules",JSON.stringify(schedules))
+  renderSchedules()
+}
+
+/* ===== ON OFF ===== */
+statusToggle.onclick=()=>{
+  bellActive=!bellActive
+  statusToggle.textContent=bellActive?"Bell: AKTIF":"Bell: NON AKTIF"
+  statusToggle.className=bellActive
+    ?"px-6 py-2 rounded-full bg-green-600 text-white font-semibold"
+    :"px-6 py-2 rounded-full bg-gray-400 text-white font-semibold"
+}
+
+/* ===== JAM ===== */
+setInterval(()=>{
+  const now=new Date()
+  const time=now.toTimeString().slice(0,5)
+  clock.textContent=now.toLocaleString("id-ID")
+
+  let next=null,info="",up=[]
+
+  Object.entries(schedules).forEach(([sess,list])=>{
+    list.forEach((s,i)=>{
+      const [h,m]=s.time.split(":")
+      const bt=new Date();bt.setHours(h,m,0,0)
+      const diff=bt-now
+
+      if(diff>0)up.push({...s,session:sess,diff})
+
+      if(bellActive&&diff>0&&diff<=300000&&(next===null||diff<next)){
+        next=diff;info=`${s.note} (${sess})`
+      }
+
+      if(bellActive&&s.time===time&&!lastPlayed[sess+i+time]){
+        const snd=sounds.find(x=>x.id==s.soundId)
+        if(snd){audio.src=snd.data;audio.play();lastPlayed[sess+i+time]=1}
+      }
+    })
+  })
+
+  up.sort((a,b)=>a.diff-b.diff)
+  upcomingDiv.innerHTML=up.slice(0,5).map(u=>`⏰ <b>${u.time}</b> - ${u.note||"-"} (${u.session})`).join("<br>")
+    ||"Tidak ada jadwal berikutnya"
+
+  if(next){
+    countdown.classList.remove("hidden")
+    countdown.textContent=`⏳ ${Math.floor(next/60000)}:${String(Math.floor(next/1000)%60).padStart(2,"0")} - ${info}`
+    countdown.className="mt-2 text-lg font-bold text-red-600 pulse-strong"
+    if(next<60000)countdown.classList.add("shake")
+  } else countdown.classList.add("hidden")
+
+  if(lastPlayed._m!=now.getMinutes())lastPlayed={_m:now.getMinutes()}
+},1000)
+
+renderSounds();renderSoundSelect();renderSchedules()
+</script>
+
+</body>
+</html>
